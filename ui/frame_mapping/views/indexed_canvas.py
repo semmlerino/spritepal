@@ -35,6 +35,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.frame_mapping.controllers.palette_editor_controller import EditorTool
+
 if TYPE_CHECKING:
     from core.editing import SelectionMask
     from core.frame_mapping_project import SheetPalette
@@ -79,6 +81,8 @@ class IndexedCanvasView(QGraphicsView):
         self._is_resizing_brush = False
         self._resize_start_x: float = 0
         self._resize_start_size: int = 1
+        self._current_tool: EditorTool | None = None
+        self._active_color: tuple[int, int, int] | None = None
 
     def _setup_view(self) -> None:
         """Configure view settings."""
@@ -111,7 +115,31 @@ class IndexedCanvasView(QGraphicsView):
             size: Brush size (1-16)
         """
         self._brush_size = max(1, min(16, size))
-        self._update_brush_cursor()
+        if self._current_tool is not None:
+            self._update_tool_cursor()
+        else:
+            self._update_brush_cursor()
+
+    def set_tool_and_color(self, tool: EditorTool, active_color: tuple[int, int, int] | None) -> None:
+        """Set the current tool and active color for cursor display."""
+        self._current_tool = tool
+        self._active_color = active_color
+        self._update_tool_cursor()
+
+    def _update_tool_cursor(self) -> None:
+        """Update cursor based on current tool."""
+        if self._current_tool is None:
+            self._update_brush_cursor()
+            return
+
+        if self._current_tool in (EditorTool.CONTIGUOUS_SELECT, EditorTool.GLOBAL_SELECT, EditorTool.PICKER):
+            self.setCursor(Qt.CursorShape.CrossCursor)
+        elif self._current_tool == EditorTool.BRUSH:
+            self._update_brush_cursor()
+        elif self._current_tool == EditorTool.ERASER:
+            self._update_eraser_cursor()
+        elif self._current_tool == EditorTool.FILL:
+            self._update_fill_cursor()
 
     def _update_brush_cursor(self) -> None:
         """Create and set a cursor showing the brush size."""
@@ -141,12 +169,87 @@ class IndexedCanvasView(QGraphicsView):
         painter.setPen(pen)
         painter.drawRect(offset + 1, offset + 1, rect_size - 2, rect_size - 2)
 
+        # Draw active color indicator in center
+        if self._active_color is not None:
+            r, g, b = self._active_color
+            indicator_size = max(4, rect_size // 3)
+            ind_offset = (cursor_size - indicator_size) // 2
+            # White outline for visibility
+            painter.setPen(QPen(QColor(255, 255, 255), 1))
+            painter.setBrush(QBrush(QColor(r, g, b)))
+            painter.drawRect(ind_offset, ind_offset, indicator_size, indicator_size)
+
         painter.end()
 
         # Create cursor with hotspot at center
         hotspot = cursor_size // 2
         self._brush_cursor = QCursor(pixmap, hotspot, hotspot)
         self.setCursor(self._brush_cursor)
+
+    def _update_eraser_cursor(self) -> None:
+        """Create and set an eraser cursor (red-tinted outline)."""
+        zoom = self.transform().m11()
+        cursor_size = max(16, int(self._brush_size * zoom * 2))
+
+        pixmap = QPixmap(cursor_size + 2, cursor_size + 2)
+        pixmap.fill(Qt.GlobalColor.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+
+        rect_size = int(self._brush_size * zoom)
+        offset = (cursor_size - rect_size) // 2
+
+        # Outer red outline
+        painter.setPen(QPen(QColor(255, 100, 100), 1))
+        painter.drawRect(offset, offset, rect_size, rect_size)
+
+        # Inner dark red outline
+        painter.setPen(QPen(QColor(128, 0, 0), 1))
+        painter.drawRect(offset + 1, offset + 1, rect_size - 2, rect_size - 2)
+
+        painter.end()
+
+        hotspot = cursor_size // 2
+        self._brush_cursor = QCursor(pixmap, hotspot, hotspot)
+        self.setCursor(self._brush_cursor)
+
+    def _update_fill_cursor(self) -> None:
+        """Create and set a fill tool cursor (color square with crosshair)."""
+        size = 24
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.GlobalColor.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+
+        center = size // 2
+
+        # Crosshair lines
+        painter.setPen(QPen(QColor(255, 255, 255), 1))
+        painter.drawLine(center, 0, center, size - 1)
+        painter.drawLine(0, center, size - 1, center)
+
+        # Color square in center
+        if self._active_color is not None:
+            r, g, b = self._active_color
+            sq_size = 8
+            sq_offset = center - sq_size // 2
+            painter.setPen(QPen(QColor(255, 255, 255), 1))
+            painter.setBrush(QBrush(QColor(r, g, b)))
+            painter.drawRect(sq_offset, sq_offset, sq_size, sq_size)
+
+        painter.end()
+
+        self._brush_cursor = QCursor(pixmap, center, center)
+        self.setCursor(self._brush_cursor)
+
+    def _restore_tool_cursor(self) -> None:
+        """Restore the tool-appropriate cursor after pan/space operations."""
+        if self._current_tool is not None:
+            self._update_tool_cursor()
+        else:
+            self._update_brush_cursor()
 
     def get_zoom(self) -> float:
         """Get current zoom level."""
@@ -158,7 +261,10 @@ class IndexedCanvasView(QGraphicsView):
         self.resetTransform()
         self.scale(zoom, zoom)
         # Update brush cursor for new zoom level
-        self._update_brush_cursor()
+        if self._current_tool is not None:
+            self._update_tool_cursor()
+        else:
+            self._update_brush_cursor()
 
     @override
     def drawBackground(self, painter: QPainter, rect: QRectF | QRect) -> None:
@@ -226,7 +332,7 @@ class IndexedCanvasView(QGraphicsView):
             if event.key() == Qt.Key.Key_Space and not event.isAutoRepeat():
                 self._is_space_pressed = False
                 if not self._is_panning:
-                    self.unsetCursor()
+                    self._restore_tool_cursor()
                 event.accept()
                 return
         super().keyReleaseEvent(event)  # type: ignore[arg-type]
@@ -324,7 +430,7 @@ class IndexedCanvasView(QGraphicsView):
             if self._is_space_pressed:
                 self.setCursor(Qt.CursorShape.OpenHandCursor)
             else:
-                self.unsetCursor()
+                self._restore_tool_cursor()
             event.accept()
             return
 
@@ -374,6 +480,7 @@ class IndexedCanvas(QWidget):
         self._palette: SheetPalette | None = None
         self._selection_mask: SelectionMask | None = None
         self._highlight_index: int | None = None  # Palette index to highlight
+        self._highlight_visible = True
         self._show_grid = False
         self._grid_size = 8
 
@@ -532,9 +639,19 @@ class IndexedCanvas(QWidget):
         self._update_highlight_overlay()
         self._update_march_timer()
 
+    def set_highlight_visible(self, visible: bool) -> None:
+        """Set whether the highlight is visible.
+
+        Args:
+            visible: True to show highlight, False to hide
+        """
+        self._highlight_visible = visible
+        self._update_highlight_overlay()
+        self._update_march_timer()
+
     def _update_march_timer(self) -> None:
         """Start or stop the marching ants timer based on current overlays."""
-        has_highlight = self._highlight_index is not None
+        has_highlight = self._highlight_visible and self._highlight_index is not None
         has_selection = self._selection_mask is not None and self._selection_mask.has_selection()
 
         if has_highlight or has_selection:
@@ -613,6 +730,10 @@ class IndexedCanvas(QWidget):
 
     def _update_highlight_overlay(self) -> None:
         """Update the highlight overlay showing edges of pixels with selected index."""
+        if not self._highlight_visible:
+            self._highlight_item.setPath(QPainterPath())
+            return
+
         if self._indexed_data is None or self._highlight_index is None:
             self._highlight_item.setPath(QPainterPath())
             return
@@ -662,6 +783,10 @@ class IndexedCanvas(QWidget):
             size: Brush size (1-16)
         """
         self._view.set_brush_size(size)
+
+    def set_tool_and_color(self, tool: EditorTool, active_color: tuple[int, int, int] | None) -> None:
+        """Set the current tool and active color for cursor display."""
+        self._view.set_tool_and_color(tool, active_color)
 
     def set_grid_size(self, size: int) -> None:
         """Set the grid cell size."""

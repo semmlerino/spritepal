@@ -98,6 +98,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._ingame_canvas: IndexedCanvas | None = None
         self._active_canvas: str = "main"  # "main" or "ingame"
         self._ingame_refresh_timer: QTimer | None = None
+        self._canvas_swapped = False
 
         self._setup_ui()
         self._setup_menu()
@@ -132,6 +133,12 @@ class AIFramePaletteEditorWindow(QMainWindow):
         center_layout = QVBoxLayout(center_widget)
         center_layout.setContentsMargins(0, 0, 0, 0)
         center_layout.setSpacing(4)
+        self._center_layout = center_layout
+
+        # Center header
+        self._center_header = QLabel("Main Canvas")
+        self._center_header.setStyleSheet("font-weight: bold; color: #AAA;")
+        center_layout.addWidget(self._center_header)
 
         # Duplicate color warning banner
         self._duplicate_warning_label = QLabel(
@@ -311,6 +318,14 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._grid_btn.clicked.connect(self._on_grid_toggled)
         layout.addWidget(self._grid_btn)
 
+        # Highlight toggle
+        self._highlight_checkbox = QCheckBox("Highlight [H]")
+        self._highlight_checkbox.setToolTip("Show/hide marching ants highlight for active index (H)")
+        self._highlight_checkbox.setChecked(True)
+        self._highlight_checkbox.setFixedHeight(28)
+        self._highlight_checkbox.toggled.connect(self._on_highlight_toggled)
+        layout.addWidget(self._highlight_checkbox)
+
         # Preview section
         layout.addSpacing(16)
         preview_label = QLabel("Preview")
@@ -365,11 +380,20 @@ class AIFramePaletteEditorWindow(QMainWindow):
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
+        self._preview_layout = layout
 
         # Header
-        header = QLabel("In-Game Canvas")
-        header.setStyleSheet("font-weight: bold; color: #AAA;")
-        layout.addWidget(header)
+        self._preview_header = QLabel("In-Game Canvas")
+        self._preview_header.setStyleSheet("font-weight: bold; color: #AAA;")
+        layout.addWidget(self._preview_header)
+
+        # Swap checkbox
+        self._swap_checkbox = QCheckBox("Swap to Center")
+        self._swap_checkbox.setToolTip("Swap in-game canvas to center position")
+        self._swap_checkbox.setFixedHeight(28)
+        self._swap_checkbox.setEnabled(False)  # Enabled when preview is active
+        self._swap_checkbox.toggled.connect(self._on_swap_toggled)
+        layout.addWidget(self._swap_checkbox)
 
         # In-game canvas (editable)
         self._ingame_canvas = IndexedCanvas()
@@ -519,9 +543,22 @@ class AIFramePaletteEditorWindow(QMainWindow):
         # Constrain toggle
         QShortcut(QKeySequence("C"), self).activated.connect(self._toggle_constrain)
 
+        # Highlight toggle
+        QShortcut(QKeySequence("H"), self).activated.connect(self._toggle_highlight)
+
     def _toggle_constrain(self) -> None:
         """Toggle constrain-to-index mode."""
         self._constrain_checkbox.setChecked(not self._constrain_checkbox.isChecked())
+
+    def _toggle_highlight(self) -> None:
+        """Toggle highlight visibility via keyboard shortcut."""
+        self._highlight_checkbox.setChecked(not self._highlight_checkbox.isChecked())
+
+    def _on_highlight_toggled(self, checked: bool) -> None:
+        """Handle highlight visibility toggle."""
+        self._main_canvas.set_highlight_visible(checked)
+        if self._ingame_canvas is not None:
+            self._ingame_canvas.set_highlight_visible(checked)
 
     def _connect_signals(self) -> None:
         """Connect controller and widget signals."""
@@ -550,6 +587,21 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
         self._main_controller.constrain_to_index_changed.connect(self._on_constrain_changed)
 
+    def _get_active_color(self) -> tuple[int, int, int] | None:
+        """Get the RGB color for the current active palette index."""
+        index = self._main_controller.active_index
+        if index < 0 or index >= len(self._palette.colors):
+            return None
+        return self._palette.colors[index]
+
+    def _update_canvas_cursors(self) -> None:
+        """Update cursors on all canvases based on current tool and color."""
+        tool = self._main_controller.current_tool
+        color = self._get_active_color()
+        self._main_canvas.set_tool_and_color(tool, color)
+        if self._ingame_canvas is not None:
+            self._ingame_canvas.set_tool_and_color(tool, color)
+
     def _load_image(self) -> None:
         """Load the AI frame image."""
         path = Path(self._ai_frame.path)
@@ -560,6 +612,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
                 self._main_canvas.set_image(data, self._palette)
                 # Initialize brush cursor
                 self._main_canvas.set_brush_size(self._main_controller.brush_size)
+                self._update_canvas_cursors()
 
             # Check for duplicate colors in palette and show warning if found
             self._update_duplicate_warning()
@@ -624,6 +677,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._tool_buttons[tool].setChecked(True)
         suffix = " [Constrained]" if self._main_controller.constrain_to_index else ""
         self._tool_label.setText(f"Tool: {tool.name.replace('_', ' ').title()}{suffix}")
+        self._update_canvas_cursors()
 
     def _on_constrain_changed(self, enabled: bool) -> None:
         """Handle constrain-to-index state change."""
@@ -790,6 +844,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._main_canvas.set_highlight_index(highlight)
         if self._ingame_canvas is not None:
             self._ingame_canvas.set_highlight_index(highlight)
+        self._update_canvas_cursors()
 
     def _on_color_mapping_report(self, report: dict[str, object]) -> None:
         """Handle color mapping analysis report after image load.
@@ -881,6 +936,44 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
     # --- Preview / In-Game Canvas ---
 
+    def _on_swap_toggled(self, checked: bool) -> None:
+        """Handle canvas swap toggle."""
+        if checked == self._canvas_swapped:
+            return
+        self._canvas_swapped = checked
+        self._perform_canvas_swap()
+
+    def _perform_canvas_swap(self) -> None:
+        """Swap or restore canvas positions between center and preview panel."""
+        if self._ingame_canvas is None:
+            return
+
+        if self._canvas_swapped:
+            # Remove canvases from their current layouts
+            self._center_layout.removeWidget(self._main_canvas)
+            self._preview_layout.removeWidget(self._ingame_canvas)
+
+            # Insert ingame canvas into center (after header + warning = index 2)
+            self._center_layout.insertWidget(2, self._ingame_canvas, 1)
+            # Insert main canvas into preview layout (after header + swap checkbox = index 2)
+            self._preview_layout.insertWidget(2, self._main_canvas, 1)
+
+            # Update labels
+            self._center_header.setText("In-Game Canvas")
+            self._preview_header.setText("Main Canvas")
+        else:
+            # Restore: remove both canvases
+            self._center_layout.removeWidget(self._ingame_canvas)
+            self._preview_layout.removeWidget(self._main_canvas)
+
+            # Reinsert at original positions
+            self._center_layout.insertWidget(2, self._main_canvas, 1)
+            self._preview_layout.insertWidget(2, self._ingame_canvas, 1)
+
+            # Restore labels
+            self._center_header.setText("Main Canvas")
+            self._preview_header.setText("In-Game Canvas")
+
     def _on_preview_toggled(self, checked: bool) -> None:
         """Handle preview toggle."""
         self._preview_enabled = checked
@@ -900,6 +993,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
             # Show preview panel
             self._preview_panel.setVisible(True)
+            self._swap_checkbox.setEnabled(True)
 
             if mapping is None:
                 self._preview_info_label.setText("No mapping - in-game canvas unavailable")
@@ -932,6 +1026,11 @@ class AIFramePaletteEditorWindow(QMainWindow):
                 if result == QMessageBox.StandardButton.No:
                     self._preview_checkbox.setChecked(True)
                     return
+
+            # Restore swap before hiding
+            if self._canvas_swapped:
+                self._swap_checkbox.setChecked(False)  # Triggers _on_swap_toggled → restore
+            self._swap_checkbox.setEnabled(False)
 
             # Hide preview panel
             self._preview_panel.setVisible(False)
@@ -1096,6 +1195,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._main_canvas.set_highlight_index(highlight)
         if self._ingame_canvas is not None:
             self._ingame_canvas.set_highlight_index(highlight)
+        self._update_canvas_cursors()
 
     def _on_palette_color_changed(self, index: int, color: tuple[int, int, int]) -> None:
         """Handle palette color change from right-click."""
@@ -1119,6 +1219,10 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
         # Also sync the palette panel's swatch (in case signal didn't update it)
         self._palette_panel.sync_palette(self._palette)
+
+        # Update cursor if the changed index is the active index
+        if index == self._main_controller.active_index:
+            self._update_canvas_cursors()
 
         # Notify workspace to refresh other frames with updated palette
         self.palette_color_changed.emit(index, color)
