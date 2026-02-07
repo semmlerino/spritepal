@@ -65,7 +65,11 @@ from core.services.content_bounds_analyzer import (
     get_content_bbox,
 )
 from core.services.image_utils import pil_to_qimage
-from core.services.rgb_to_indexed import convert_indexed_to_rgb, load_image_preserving_indices
+from core.services.rgb_to_indexed import (
+    convert_indexed_to_pil_indexed,
+    convert_indexed_to_rgb,
+    load_image_preserving_indices,
+)
 from core.services.sprite_compositor import TransformParams
 from core.services.tile_sampling_service import TileSamplingService
 from core.types import CompressionType
@@ -1176,9 +1180,9 @@ class WorkbenchCanvas(QWidget):
         if self._ingame_edited_path != path:
             self._ingame_edited_path = path
             # When in-game edits are saved, reverse-extract the AI frame
-            # indices from the composite so the compositor uses edited
-            # indices when _ingame_edited_path is later cleared by
-            # user-initiated transform changes (e.g. alignment drag).
+            # indices from the composite and overwrite the original AI frame
+            # file. This persists edited indices to disk so they survive
+            # alignment drags, frame re-selection, and app restarts.
             if path is not None and self._sheet_palette is not None:
                 ingame_path = Path(path)
                 if ingame_path.exists():
@@ -1191,9 +1195,7 @@ class WorkbenchCanvas(QWidget):
                         )
                         if extracted is not None:
                             self._ai_index_map = extracted
-                            # Update cache entry so re-selection of this
-                            # frame doesn't reload stale indices from disk
-                            self._update_ai_frame_cache_index_map(extracted)
+                            self._persist_extracted_indices(extracted)
             self._schedule_preview_update()
 
     def _extract_ai_indices_from_composite(
@@ -1262,20 +1264,28 @@ class WorkbenchCanvas(QWidget):
 
         return np.array(img, dtype=np.uint8)
 
-    def _update_ai_frame_cache_index_map(self, index_map: np.ndarray) -> None:
-        """Replace the index_map in the current AI frame's cache entry.
+    def _persist_extracted_indices(self, index_map: np.ndarray) -> None:
+        """Overwrite the current AI frame file with edited indices.
 
-        Keeps the pixmap, PIL image, bbox, and mtime intact so that
-        re-selecting this frame returns the edited indices instead of
-        reloading stale data from the original file on disk.
+        Saves the index map as an indexed PNG (with the sheet palette
+        embedded) so that any future reload from disk — whether from
+        cache eviction, frame re-selection, or app restart — gets the
+        edited data.
         """
-        if self._current_ai_frame is None:
+        if self._current_ai_frame is None or self._sheet_palette is None:
             return
         frame_path = self._current_ai_frame.path
-        entry = self._ai_frame_cache.get(frame_path)
-        if entry is None:
+        try:
+            pil_indexed = convert_indexed_to_pil_indexed(
+                index_map, self._sheet_palette
+            )
+            pil_indexed.save(frame_path)
+            logger.info("Persisted edited indices to %s", frame_path.name)
+        except Exception:
+            logger.exception("Failed to persist indices to %s", frame_path)
             return
-        self._ai_frame_cache[frame_path] = entry._replace(index_map=index_map)
+        # Evict cache — mtime changed, next set_ai_frame reloads fresh
+        self._ai_frame_cache.pop(frame_path, None)
 
     def _get_ai_frame_from_cache(self, path: Path) -> _AIFrameCacheEntry | None:
         """Get AI frame from cache if valid (exists and mtime matches).
