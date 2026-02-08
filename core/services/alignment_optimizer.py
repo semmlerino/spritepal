@@ -111,7 +111,7 @@ class AlignmentOptimizer:
             center_y = int(centroid_y - scaled_height / 2 - ai_top * scale)
 
             # Check centered position first
-            has_overflow, _ = self._service.check_content_outside_tiles(ai_bbox, tile_rects, center_x, center_y, scale)
+            has_overflow = self._service.has_content_outside_tiles(ai_bbox, tile_rects, center_x, center_y, scale)
             if not has_overflow:
                 return (True, center_x, center_y)
 
@@ -127,6 +127,10 @@ class AlignmentOptimizer:
                 # Check perimeter of square at this radius
                 for dx in range(-radius, radius + 1):
                     for dy in range(-radius, radius + 1):
+                        # Check cancellation periodically in inner loop
+                        if cancelled and (dy % 16 == 0) and cancelled():
+                            return (False, center_x, center_y)
+
                         # Only check perimeter points
                         if abs(dx) != radius and abs(dy) != radius:
                             continue
@@ -134,7 +138,7 @@ class AlignmentOptimizer:
                         test_x = center_x + dx
                         test_y = center_y + dy
 
-                        has_overflow, _ = self._service.check_content_outside_tiles(
+                        has_overflow = self._service.has_content_outside_tiles(
                             ai_bbox, tile_rects, test_x, test_y, scale
                         )
                         if not has_overflow:

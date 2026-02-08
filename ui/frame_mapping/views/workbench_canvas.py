@@ -1089,6 +1089,9 @@ class WorkbenchCanvas(QWidget):
         """
         self._current_ai_frame = frame
 
+        # Cancel any running alignment worker — it uses stale data after frame switch
+        self._cancel_alignment_worker()
+
         # Clear async service image caches since AI frame is changing
         self._async_preview_service.clear_image_cache()
         self._async_highlight_service.clear_image_cache()
@@ -1461,6 +1464,13 @@ class WorkbenchCanvas(QWidget):
         """Cancel in-flight async preview and highlight operations."""
         self._async_preview_service.cancel()
         self._async_highlight_service.cancel()
+
+    def _cancel_alignment_worker(self) -> None:
+        """Cancel any running alignment worker thread."""
+        if self._alignment_worker is not None and self._alignment_worker.isRunning():
+            self._alignment_worker.requestInterruption()
+            self._alignment_worker.quit()
+            self._alignment_worker.wait(2000)
 
     def clear(self) -> None:
         """Clear all content."""
@@ -2227,7 +2237,7 @@ class WorkbenchCanvas(QWidget):
         service = TileSamplingService()
 
         # Check if initial position works
-        has_overflow, _ = service.check_content_outside_tiles(
+        has_overflow = service.has_content_outside_tiles(
             ai_bbox, tile_rects, initial_offset_x, initial_offset_y, scale
         )
         if not has_overflow:
@@ -2267,7 +2277,7 @@ class WorkbenchCanvas(QWidget):
                     test_x = initial_offset_x + dx
                     test_y = initial_offset_y + dy
 
-                    has_overflow, _ = service.check_content_outside_tiles(ai_bbox, tile_rects, test_x, test_y, scale)
+                    has_overflow = service.has_content_outside_tiles(ai_bbox, tile_rects, test_x, test_y, scale)
                     if not has_overflow:
                         return (test_x, test_y, True)
 
@@ -2311,10 +2321,7 @@ class WorkbenchCanvas(QWidget):
         # Use optimal alignment when Match Scale is checked
         if self._match_scale_checkbox.isChecked() and ai_content_width > 0 and ai_content_height > 0:
             # Cancel any existing worker
-            if self._alignment_worker is not None and self._alignment_worker.isRunning():
-                self._alignment_worker.requestInterruption()
-                self._alignment_worker.quit()
-                self._alignment_worker.wait(1000)
+            self._cancel_alignment_worker()
 
             # Get tile rects and prepare bbox for worker
             tile_rects = self._get_cached_tile_rects()

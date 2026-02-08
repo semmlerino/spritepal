@@ -437,6 +437,98 @@ class TileSamplingService:
 
         return (len(overflow_rects) > 0, overflow_rects)
 
+    def has_content_outside_tiles(
+        self,
+        content_bbox: tuple[int, int, int, int] | None,
+        tile_rects: list[tuple[int, int, int, int]],
+        offset_x: int,
+        offset_y: int,
+        scale: float,
+    ) -> bool:
+        """Fast boolean check if AI frame content extends outside tiles.
+
+        This is a fast path for alignment search loops that short-circuits
+        on the first uncovered cell. Unlike check_content_outside_tiles(),
+        this does not accumulate overflow cells or merge them into rects,
+        avoiding millions of temporary allocations in tight loops.
+
+        Args:
+            content_bbox: Non-transparent content bounding box from PIL.Image.getbbox()
+                in format (left, top, right, bottom) in source image coordinates.
+                None if image is fully transparent.
+            tile_rects: List of (x, y, w, h) rectangles for each tile in scene
+                coordinates (relative to game frame origin).
+            offset_x: X offset of AI frame in scene coordinates.
+            offset_y: Y offset of AI frame in scene coordinates.
+            scale: Scale factor applied to AI frame.
+
+        Returns:
+            True if any content extends outside tiles, False otherwise.
+        """
+        if content_bbox is None:
+            # Fully transparent image - no overflow
+            return False
+
+        if not tile_rects:
+            # No tiles - everything is overflow
+            return True
+
+        scale = self.clamp_scale(scale)
+
+        # Transform content bbox to scene coordinates
+        src_left, src_top, src_right, src_bottom = content_bbox
+        scene_left = int(src_left * scale) + offset_x
+        scene_top = int(src_top * scale) + offset_y
+        scene_right = int(src_right * scale) + offset_x
+        scene_bottom = int(src_bottom * scale) + offset_y
+
+        # Use 8x8 grid cells (matching tile size) to check coverage
+        cell_size = 8
+
+        # Round content bounds to cell grid for iteration
+        cell_start_x = scene_left // cell_size
+        cell_start_y = scene_top // cell_size
+        cell_end_x = (scene_right + cell_size - 1) // cell_size
+        cell_end_y = (scene_bottom + cell_size - 1) // cell_size
+
+        for cell_y in range(cell_start_y, cell_end_y):
+            for cell_x in range(cell_start_x, cell_end_x):
+                cell_rect_left = cell_x * cell_size
+                cell_rect_top = cell_y * cell_size
+                cell_rect_right = cell_rect_left + cell_size
+                cell_rect_bottom = cell_rect_top + cell_size
+
+                # Check if this cell actually overlaps with content
+                if (
+                    cell_rect_right <= scene_left
+                    or cell_rect_left >= scene_right
+                    or cell_rect_bottom <= scene_top
+                    or cell_rect_top >= scene_bottom
+                ):
+                    continue
+
+                # Check if this cell overlaps with any tile
+                cell_covered = False
+                for tile_x, tile_y, tile_w, tile_h in tile_rects:
+                    tile_right = tile_x + tile_w
+                    tile_bottom = tile_y + tile_h
+                    # Check for overlap
+                    if not (
+                        cell_rect_right <= tile_x
+                        or cell_rect_left >= tile_right
+                        or cell_rect_bottom <= tile_y
+                        or cell_rect_top >= tile_bottom
+                    ):
+                        cell_covered = True
+                        break
+
+                if not cell_covered:
+                    # Short-circuit on first uncovered cell
+                    return True
+
+        # No uncovered cells found
+        return False
+
     def _merge_overflow_cells(
         self,
         cells: set[tuple[int, int]],
