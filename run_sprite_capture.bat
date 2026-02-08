@@ -1,5 +1,5 @@
 @echo off
-cd /d "C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal"
+cd /d "%~dp0"
 
 set MESEN_EXE=.\tools\mesen2\Mesen2.exe
 set ROM_PATH=roms\Kirby Super Star (USA).sfc

@@ -3,6 +3,7 @@
 Analyze decompression quality and investigate alignment warnings
 """
 
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -153,7 +154,9 @@ def check_sprite_validity(data_preview: bytes) -> dict:
 
 def main():
     """Main decompression analysis"""
-    rom_path = "../Kirby Super Star (USA).sfc"
+    rom_path = os.environ.get(
+        "SPRITEPAL_ROM_PATH", str(Path(__file__).resolve().parents[2] / "roms" / "Kirby Super Star (USA).sfc")
+    )
 
     if not Path(rom_path).exists():
         print(f"Error: ROM not found: {rom_path}")

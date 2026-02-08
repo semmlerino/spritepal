@@ -3,6 +3,7 @@
 Test discovered sprite offsets using the existing ROMExtractor
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -64,7 +65,9 @@ def test_offset_extraction(rom_path: str, offset: int, output_dir: str, test_nam
 
 def main():
     """Test high-priority offsets from our correlation analysis"""
-    rom_path = "../Kirby Super Star (USA).sfc"
+    rom_path = os.environ.get(
+        "SPRITEPAL_ROM_PATH", str(Path(__file__).resolve().parents[2] / "roms" / "Kirby Super Star (USA).sfc")
+    )
     output_dir = "validation_test_output"
 
     # Create output directory

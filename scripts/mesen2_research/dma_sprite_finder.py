@@ -6,6 +6,7 @@ Launches Mesen2 with DMA monitoring Lua script to discover ROM sprite offsets
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -205,7 +206,9 @@ def main():
     if len(sys.argv) > 1:
         rom_path = sys.argv[1]
     else:
-        rom_path = str(Path(__file__).parent.parent / "Kirby Super Star (USA).sfc")
+        rom_path = os.environ.get(
+            "SPRITEPAL_ROM_PATH", str(Path(__file__).resolve().parents[2] / "roms" / "Kirby Super Star (USA).sfc")
+        )
 
     if not Path(rom_path).exists():
         print(f"Error: ROM file not found: {rom_path}")

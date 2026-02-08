@@ -6,6 +6,7 @@ Uses exhal tool to validate sprite offsets by attempting decompression
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -233,7 +234,9 @@ class ExhalSpriteValidator:
 
 def main():
     """Test the exhal sprite validator"""
-    rom_path = "Kirby Super Star (USA).sfc"
+    rom_path = os.environ.get(
+        "SPRITEPAL_ROM_PATH", str(Path(__file__).resolve().parents[2] / "roms" / "Kirby Super Star (USA).sfc")
+    )
 
     if not Path(rom_path).exists():
         print(f"Error: ROM file not found: {rom_path}")

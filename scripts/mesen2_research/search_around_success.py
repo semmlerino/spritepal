@@ -3,6 +3,7 @@
 Search systematically around successful sprite finds for larger character data
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -77,7 +78,9 @@ def search_region(
 
 def main():
     """Search around successful areas for larger character sprites"""
-    rom_path = "../Kirby Super Star (USA).sfc"
+    rom_path = os.environ.get(
+        "SPRITEPAL_ROM_PATH", str(Path(__file__).resolve().parents[2] / "roms" / "Kirby Super Star (USA).sfc")
+    )
     output_dir = "systematic_sprite_search"
 
     Path(output_dir).mkdir(exist_ok=True)

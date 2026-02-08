@@ -20,7 +20,7 @@ REM   run_diversity_capture.bat [savestate_name]
 REM   run_diversity_capture.bat spring_breeze_whispy
 REM   run_diversity_capture.bat all  (runs all savestates)
 
-cd /d "C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal"
+cd /d "%~dp0\.."
 
 set MESEN_EXE=tools\mesen2\Mesen2.exe
 set ROM_PATH=roms\Kirby Super Star (USA).sfc

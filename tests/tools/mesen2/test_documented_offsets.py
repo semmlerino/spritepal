@@ -3,6 +3,7 @@
 Test documented Kirby Super Star sprite offsets from ROM hacking community
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -45,7 +46,9 @@ def test_documented_offset(rom_path: str, offset: int, output_dir: str, test_nam
 
 def main():
     """Test documented ROM offsets for actual character sprites"""
-    rom_path = "../Kirby Super Star (USA).sfc"
+    rom_path = os.environ.get(
+        "SPRITEPAL_ROM_PATH", str(Path(__file__).resolve().parents[3] / "roms" / "Kirby Super Star (USA).sfc")
+    )
     output_dir = "documented_sprite_test"
 
     Path(output_dir).mkdir(exist_ok=True)

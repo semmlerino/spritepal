@@ -117,7 +117,7 @@ def find_sprite_pattern(vram_data, start_offset=0x6A00, size=0x80):
 
 
 def main():
-    base_dir = Path("/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal")
+    base_dir = Path(__file__).resolve().parents[2]
 
     before_path = base_dir / "Before.mss"
     base_dir / "Entering.mss"

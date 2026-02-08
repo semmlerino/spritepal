@@ -3,6 +3,7 @@
 Extract the largest sprite candidates found in systematic search
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -50,7 +51,9 @@ def extract_candidate(rom_path: str, offset: int, output_dir: str, expected_tile
 
 def main():
     """Extract the highest-priority large sprite candidates"""
-    rom_path = "../Kirby Super Star (USA).sfc"
+    rom_path = os.environ.get(
+        "SPRITEPAL_ROM_PATH", str(Path(__file__).resolve().parents[2] / "roms" / "Kirby Super Star (USA).sfc")
+    )
     output_dir = "large_sprite_candidates"
 
     Path(output_dir).mkdir(exist_ok=True)

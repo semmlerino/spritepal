@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 
 # Mesen2 executable location (relative to mesen2_integration directory)
-MESEN_EXE_PATH = "../Mesen2.exe"
+MESEN_EXE_PATH = "tools/mesen2/Mesen2.exe"
 
 
 def wsl_to_windows_path(wsl_path: str | Path) -> str:
@@ -32,8 +32,8 @@ def wsl_to_windows_path(wsl_path: str | Path) -> str:
 
 def get_mesen_exe_path() -> str:
     """Get the Windows path to Mesen2.exe"""
-    # This file is in mesen2_integration/, Mesen2.exe is in parent (spritepal/)
-    mesen_path = Path(__file__).parent / MESEN_EXE_PATH  # Changed from parent.parent to parent
+    # MESEN_EXE_PATH is relative to project root
+    mesen_path = Path(__file__).parent.parent / MESEN_EXE_PATH
     if not mesen_path.exists():
         raise FileNotFoundError(f"Mesen2.exe not found at {mesen_path}")
 

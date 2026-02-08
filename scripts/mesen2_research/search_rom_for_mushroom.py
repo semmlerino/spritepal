@@ -4,6 +4,7 @@ Search ROM for mushroom sprite data by looking for patterns that match
 what we see in VRAM at $6A00
 """
 
+import os
 import struct
 from pathlib import Path
 
@@ -81,9 +82,11 @@ def analyze_vram_region(rom_path, savestate_data):
 
 
 def main():
-    base_dir = Path("/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master")
-    rom_path = base_dir / "Kirby Super Star (USA).sfc"
-    sprite_data_path = base_dir / "spritepal" / "mushroom_sprite_candidate_006A00.bin"
+    rom_path = os.environ.get(
+        "SPRITEPAL_ROM_PATH", str(Path(__file__).resolve().parents[2] / "roms" / "Kirby Super Star (USA).sfc")
+    )
+    project_root = Path(__file__).resolve().parents[2]
+    sprite_data_path = project_root / "mushroom_sprite_candidate_006A00.bin"
 
     print("Searching ROM for mushroom sprite data...")
     print("-" * 60)

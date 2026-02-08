@@ -23,7 +23,7 @@ Failure modes:
     - Exit 4: Copy to tools/ failed
 
 Source location:
-    ../archive/obsolete_test_images/ultrathink/
+    tools/hal_src/
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
 TOOLS_DIR = SCRIPT_DIR / "tools"
-SOURCE_DIR = SCRIPT_DIR.parent / "archive" / "obsolete_test_images" / "ultrathink"
+SOURCE_DIR = SCRIPT_DIR / "tools" / "hal_src"
 
 # Source files required for compilation
 EXHAL_SOURCES = ["exhal.c", "compress.c"]

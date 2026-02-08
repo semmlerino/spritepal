@@ -24,7 +24,7 @@ def main():
     print("🔍 Running basedpyright to find critical errors...\n")
 
     # Run basedpyright
-    result = subprocess.run(["../venv/bin/basedpyright", "."], check=False, capture_output=True, text=True)
+    result = subprocess.run(["basedpyright", "."], check=False, capture_output=True, text=True)
 
     output = result.stdout + result.stderr
 

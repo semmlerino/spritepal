@@ -24,7 +24,7 @@ import time
 from pathlib import Path
 
 # Paths
-SPRITEPAL_DIR = Path(r"C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal")
+SPRITEPAL_DIR = Path(__file__).resolve().parent.parent
 BATCH_FILE = SPRITEPAL_DIR / "run_ablation_range.bat"
 LOG_FILE = SPRITEPAL_DIR / "mesen2_exchange" / "dma_probe_log.txt"
 DEFAULT_BASELINE = SPRITEPAL_DIR / "prg_sweep_baseline_v225.txt"

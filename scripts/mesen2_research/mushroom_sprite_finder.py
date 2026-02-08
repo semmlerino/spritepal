@@ -4,6 +4,7 @@ Mushroom Sprite Finder
 Traces a visible mushroom sprite back to its ROM offset using savestate analysis
 """
 
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -13,7 +14,11 @@ class MushroomSpriteFinder:
     def __init__(self):
         self.base_dir = Path(__file__).parent.absolute()
         self.mesen_exe = self.base_dir / ".." / "Mesen2.exe"
-        self.rom_path = self.base_dir / ".." / "Kirby Super Star (USA).sfc"
+        self.rom_path = Path(
+            os.environ.get(
+                "SPRITEPAL_ROM_PATH", str(Path(__file__).resolve().parents[2] / "roms" / "Kirby Super Star (USA).sfc")
+            )
+        )
         self.lua_script = self.base_dir / "lua_scripts" / "mushroom_sprite_tracker.lua"
         self.log_path = Path("C:/Users/gabri/OneDrive/Dokumente/Mesen2/mushroom_sprite_log.txt")
 

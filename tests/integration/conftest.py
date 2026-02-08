@@ -163,15 +163,14 @@ def real_kirby_rom():
     Set SPRITEPAL_KIRBY_ROM env var in CI to specify exact location.
     """
     # Try multiple locations in order of preference
+    project_root = Path(__file__).parent.parent.parent
     candidates = [
         # Environment variable (CI/CD can set this)
         Path(os.environ.get("SPRITEPAL_KIRBY_ROM", "")),
-        # Relative to this file (integration/conftest.py -> spritepal/ -> exhal-master/)
-        Path(__file__).parent.parent.parent.parent / "Kirby Super Star (USA).sfc",
-        # Relative to spritepal/ (legacy location)
-        Path(__file__).parent.parent.parent / "Kirby Super Star (USA).sfc",
-        # Legacy relative path (may work in some working directories)
-        Path("../Kirby Super Star (USA).sfc"),
+        # roms/ directory in project root
+        project_root / "roms" / "Kirby Super Star (USA).sfc",
+        # Directly in project root (legacy location)
+        project_root / "Kirby Super Star (USA).sfc",
     ]
 
     for path in candidates:

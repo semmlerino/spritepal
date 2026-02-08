@@ -65,11 +65,9 @@ def _find_real_hal_binaries() -> tuple[str, str] | None:
         return (exhal_path, inhal_path)
 
     # Try common locations relative to project
-    project_root = Path(__file__).parent.parent.parent.parent  # exhal-master
+    project_root = Path(__file__).parent.parent.parent  # spritepal root
     common_locations = [
-        project_root / "bin",
-        project_root,
-        project_root / "spritepal" / "tools",
+        project_root / "tools",
         Path.home() / ".local" / "bin",
     ]
 

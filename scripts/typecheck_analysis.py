@@ -50,7 +50,7 @@ class TypeCheckAnalyzer:
 
     def run_basedpyright(self, files: list[str] | None = None) -> str:
         """Run basedpyright and capture output."""
-        cmd = ["../venv/bin/basedpyright"]
+        cmd = ["basedpyright"]
 
         if files:
             cmd.extend(files)

@@ -94,5 +94,18 @@ init_order_issues.json
 .venv/
 archive_obsolete_*/
 
+# HAL compiled binaries (compiled from tools/hal_src/)
+tools/exhal
+tools/exhal.exe
+tools/inhal
+tools/inhal.exe
+tools/.platform_*
+
+# Mesen2 emulator binary (too large for git, install separately)
+tools/mesen2/
+
+# Mesen2 exchange files (runtime captures)
+mesen2_exchange/*.json
+
 # Project-specific working directories (not part of SpritePal)
 M/

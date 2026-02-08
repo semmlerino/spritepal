@@ -3,6 +3,7 @@
 Focused sprite scan using exhal around successful decompression offsets
 """
 
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -78,7 +79,9 @@ def analyze_sprite_data(data: bytes, size: int) -> dict:
 
 def scan_focused_areas():
     """Scan around successful decompression offsets"""
-    rom_path = "../Kirby Super Star (USA).sfc"
+    rom_path = os.environ.get(
+        "SPRITEPAL_ROM_PATH", str(Path(__file__).resolve().parents[2] / "roms" / "Kirby Super Star (USA).sfc")
+    )
 
     if not Path(rom_path).exists():
         print(f"Error: ROM not found: {rom_path}")

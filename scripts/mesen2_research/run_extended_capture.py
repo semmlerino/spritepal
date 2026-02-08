@@ -3,6 +3,7 @@
 Launch extended Mesen2 sprite capture session
 """
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -16,14 +17,16 @@ def run_extended_capture():
 
     # Get paths
     mesen_exe = get_mesen_executable()
-    rom_path = wsl_to_windows_path("../Kirby Super Star (USA).sfc")
+    rom_path_fallback = str(Path(__file__).resolve().parents[2] / "roms" / "Kirby Super Star (USA).sfc")
+    rom_path_local = os.environ.get("SPRITEPAL_ROM_PATH", rom_path_fallback)
+    rom_path = wsl_to_windows_path(rom_path_local)
     lua_script_path = wsl_to_windows_path("lua_scripts/extended_sprite_capture.lua")
 
     print(f"Mesen2: {mesen_exe}")
     print(f"ROM: {rom_path}")
     print(f"Script: {lua_script_path}")
 
-    if not Path("../Kirby Super Star (USA).sfc").exists():
+    if not Path(rom_path_local).exists():
         print("❌ ROM file not found")
         return 1
 

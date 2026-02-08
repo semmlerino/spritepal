@@ -1089,14 +1089,9 @@ class HALCompressor:
         search_paths = [
             # Compiled tools directory (preferred) - use absolute paths
             spritepal_dir / "tools" / tool_with_suffix,
-            # Alternative tools locations relative to spritepal
-            spritepal_dir.parent / "tools" / tool_with_suffix,  # exhal-master/tools/
             # Working directory relative paths (for backward compatibility)
             Path.cwd() / "tools" / tool_with_suffix,
             Path.cwd() / tool_with_suffix,
-            # Parent directories from current working directory
-            Path.cwd().parent / tool_name,
-            Path.cwd().parent.parent / tool_name,
         ]
 
         # Add system PATH as string for shutil.which
