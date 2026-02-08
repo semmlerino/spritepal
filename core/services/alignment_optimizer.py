@@ -7,11 +7,16 @@ scale where AI content fits entirely within tile coverage.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from core.services.tile_sampling_service import TileSamplingService
 
 logger = logging.getLogger(__name__)
+
+
+class AlignmentCancelled(Exception):
+    """Exception raised when alignment computation is cancelled."""
 
 
 @dataclass
@@ -49,6 +54,7 @@ class AlignmentOptimizer:
         ai_bbox: tuple[int, int, int, int],
         tile_rects: list[tuple[int, int, int, int]],
         initial_scale: float | None = None,
+        cancelled: Callable[[], bool] | None = None,
     ) -> AlignmentResult:
         """Find the optimal alignment that maximizes scale without overflow.
 
@@ -56,9 +62,13 @@ class AlignmentOptimizer:
             ai_bbox: AI content bounding box (left, top, right, bottom) in source coords
             tile_rects: List of (x, y, w, h) tile rectangles in scene coords
             initial_scale: Optional initial scale estimate
+            cancelled: Optional callback that returns True if computation should stop
 
         Returns:
             AlignmentResult with optimal offset and scale
+
+        Raises:
+            AlignmentCancelled: If cancelled() returns True during computation
         """
         if not tile_rects:
             return AlignmentResult(0, 0, 1.0, success=False)
@@ -110,6 +120,10 @@ class AlignmentOptimizer:
             search_radius = max(tile_width, tile_height)
 
             for radius in range(1, search_radius + 1):
+                # Check for cancellation at start of each radius iteration
+                if cancelled and cancelled():
+                    return (False, center_x, center_y)
+
                 # Check perimeter of square at this radius
                 for dx in range(-radius, radius + 1):
                     for dy in range(-radius, radius + 1):
@@ -151,6 +165,10 @@ class AlignmentOptimizer:
         # Binary search iterations
         max_iterations = 30
         for i in range(max_iterations):
+            # Check for cancellation at start of each iteration
+            if cancelled and cancelled():
+                break
+
             iterations = i + 1
             mid = (low + high) / 2
 
@@ -166,6 +184,10 @@ class AlignmentOptimizer:
             # Converged to sufficient precision
             if high - low < 0.001:
                 break
+
+        # Check if cancelled during computation
+        if cancelled and cancelled():
+            raise AlignmentCancelled
 
         # Final verification
         fits, final_x, final_y = find_valid_position(best_scale)

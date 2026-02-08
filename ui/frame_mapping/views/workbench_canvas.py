@@ -59,7 +59,7 @@ from PySide6.QtWidgets import (
 
 from core.frame_mapping_project import AIFrame, GameFrame
 from core.mesen_integration.capture_renderer import CaptureRenderer
-from core.services.alignment_optimizer import AlignmentOptimizer, AlignmentResult
+from core.services.alignment_optimizer import AlignmentCancelled, AlignmentOptimizer, AlignmentResult
 from core.services.content_bounds_analyzer import (
     ContentBoundsAnalyzer,
     get_content_bbox,
@@ -132,13 +132,22 @@ class AlignmentWorker(QThread):
             result = optimizer.compute_optimal_alignment(
                 ai_bbox=self._ai_bbox,
                 tile_rects=self._tile_rects,
+                cancelled=self.isInterruptionRequested,
             )
+
+            # Check for interruption before emitting result
+            if self.isInterruptionRequested():
+                return
+
             self.result_ready.emit(
                 result.offset_x,
                 result.offset_y,
                 result.scale,
                 result.success,
             )
+        except AlignmentCancelled:
+            logger.debug("Alignment computation was cancelled")
+            return
         except Exception as exc:
             logger.warning("AlignmentWorker failed: %s", exc)
             ai_left, ai_top, ai_right, ai_bottom = self._ai_bbox
