@@ -10,7 +10,7 @@ A PySide6 sprite editor for SNES ROM hacking — extract, edit, and inject sprit
 
 ROM hacking SNES games requires working with sprites stored in proprietary compressed formats. Existing tools are either command-line only, limited to viewing, or lack HAL compression support. SpritePal provides a full extract→edit→inject workflow in a modern GUI, with Mesen 2 emulator integration so you can click a sprite on screen and jump directly to its ROM offset.
 
-> **Screenshot:** *(add screenshot here — run `uv run python launch_spritepal.py` and screenshot the main window)*
+![SpritePal — ROM offset browser with sprite extraction](SB.jpg)
 
 
 ## Features
