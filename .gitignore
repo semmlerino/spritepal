@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-
-# AI tool config dirs
-=======
 # Python
 __pycache__/
 *.py[cod]
@@ -49,7 +45,8 @@ htmlcov/
 
 # Logs
 *.log
-logs/
+logs/*
+!logs/.gitkeep
 
 # Temporary files
 *.tmp
@@ -109,7 +106,8 @@ tools/.platform_*
 tools/mesen2/
 
 # Mesen2 exchange files (runtime captures)
-mesen2_exchange/*.json
+mesen2_exchange/*
+!mesen2_exchange/.gitkeep
 
 # Project-specific working directories (not part of SpritePal)
 M/

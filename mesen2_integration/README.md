@@ -569,7 +569,7 @@ python scripts/trace_sprites_to_rom.py dumps/F17987 rom.sfc --obsel 0x63 --palet
 ### Project Structure
 
 ```
-M/dedede_project/
+docs/root_cleanup_archive_20260307/M/dedede_project/
 ├── project.json        # Frame metadata
 ├── frames/             # AI sprite frames (frame_00.png - frame_14.png)
 ├── dedede_only/        # Game frames filtered by palette
