@@ -1,8 +1,133 @@
+<<<<<<< HEAD
 
 # AI tool config dirs
+=======
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+temp/
+
+# SpritePal specific outputs
+output/
+*.dmp
+*.smc
+
+# Test outputs and generated files (organized directories)
+test_output/
+*.pal.json
+*.metadata.json
+
+# Archive directories - historical/deprecated code (keep for reference)
+# archive/ and archive_2025_07_19/ are preserved for historical reference
+# but may contain large files that shouldn't be tracked
+archive/
+archive_2025_08_09/
+
+# Settings files (user-specific)
+.spritepal_settings.json
+config/test_profiles/
+.testapp_settings.json
+.spritepal-integration-test_settings.json
+.*-test_settings.json
+.*-debug_settings.json
+
+# ROM files for development (large binary files)
+*.sfc
+*.smc
+
+# Image files (development artifacts)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+
+# Generated analysis reports
+typecheck_report_*.json
+import_analysis_report.json
+init_order_issues.json
+.venv/
+archive_obsolete_*/
+
+# HAL compiled binaries (compiled from tools/hal_src/)
+tools/exhal
+tools/exhal.exe
+tools/inhal
+tools/inhal.exe
+tools/.platform_*
+
+# Mesen2 emulator binary (too large for git, install separately)
+tools/mesen2/
+
+# Mesen2 exchange files (runtime captures)
+mesen2_exchange/*.json
+
+# Project-specific working directories (not part of SpritePal)
+M/
+
+# AI tool configs
 .claude/
 .serena/
 .kiro/
 .windsurf/
 .geminiignore
+.luacheckrc
+
+# Dev artifacts
 .logs/
+0x017742
+ARCHITECTURE_EVALUATION.md
+ARCHITECTURE_REFACTOR_PLAN.md
+BRITTLE_TESTS_REPORT.md
+CONCURRENCY_AUDIT_REPORT.md
+2mapping.spritepal-mapping.json
+3mapping.spritepal-mapping.json
